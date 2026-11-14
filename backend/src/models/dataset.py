@@ -9,3 +9,4 @@ class Dataset(Base):
     records: Mapped[list] = mapped_column(JSON)
     checksum: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[float] = mapped_column(Double)
+    updated_at: Mapped[float | None] = mapped_column(Double, nullable=True)

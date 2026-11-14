@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, update
 from src.config.database import get_db
-from src.models import Job
+from src.models import Job, JobSnapshot
 from src.schemas.job import JobInput
 from src.middlewares.auth import current_user, can_write, admin_only
 from src.services import jobs
@@ -13,13 +13,14 @@ def listing(db=Depends(get_db),u=Depends(current_user)):
     return [job_dict(j) for j in db.scalars(select(Job).order_by(Job.id.desc()).limit(100))]
 @router.post('',status_code=201)
 def create(data:JobInput,db=Depends(get_db),u=Depends(can_write)):
-    j=jobs.create(db,data,u); record(db,u.email,'job.create',{'id':j.id,'params':j.params})
+    j=jobs.create(db,data,u); record(db,u.email,'job.create',{'id':j.id,'params':j.params,'dataset':j.dataset_id})
     db.commit(); jobs.enqueue(j.id); return job_dict(j)
 @router.get('/{id}')
 def detail(id:int,db=Depends(get_db),u=Depends(current_user)):
     j=db.get(Job,id)
     if not j: raise HTTPException(404,'分析任务不存在')
-    return job_dict(j)
+    snapshot=db.scalar(select(JobSnapshot).where(JobSnapshot.job_id==j.id))
+    return {**job_dict(j),'snapshot':jobs.snapshot_dict(snapshot) if snapshot else None}
 @router.post('/{id}/approve')
 def approve(id:int,db=Depends(get_db),u=Depends(admin_only)):
     j=db.get(Job,id)
